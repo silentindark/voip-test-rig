@@ -7,3 +7,6 @@ certs/out/
 # Editor / OS noise
 *.swp
 .DS_Store
+
+# Various
+tmp/
