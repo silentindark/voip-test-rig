@@ -7,10 +7,14 @@ on:
   push:
     branches: ["**"]
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:        # manual "Run workflow" button
+    inputs:
+      agent_count:
+        description: "Number of Sipfront agents to launch"
+        default: "2"
 
 env:
-  AGENT_COUNT: "2"
+  AGENT_COUNT: ${{ github.event.inputs.agent_count || '2' }}
 
 jobs:
   rig:
