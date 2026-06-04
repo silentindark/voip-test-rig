@@ -101,12 +101,37 @@ passwords) or use `make agent`.
 > last Debian release that ships the asterisk daemon — it was dropped in
 > bookworm+) straight from the archive. No external tokens or accounts needed.
 
-Once it's up, point a softphone at `kamailio.rig.local:5060` (add a hosts entry to
-`172.30.10.10`) as `alice@rig.local` / `bob@rig.local`, or open the web client at
-`https://localhost:8081/` (trust `certs/out/ca.crt`) and register as
-`webrtc@rig.local`. Call `moh@rig.local`, `voicemail@rig.local`, `ivr@rig.local`,
-`ooo@rig.local`, or another subscriber. Seeded test passwords are in
+### Web client (browser on the host)
+
+> **Trust the CA first.** The web client signals over **WSS**, and browsers do
+> *not* prompt to accept a self-signed cert on a WebSocket — they just close it
+> (error code `1006`). So you must trust the rig CA up front:
+> ```bash
+> # macOS:
+> sudo security add-trusted-cert -d -r trustRoot \
+>   -k /Library/Keychains/System.keychain certs/out/ca.crt
+> ```
+> (Linux: copy `certs/out/ca.crt` into your browser/OS trust store.) Alternatively,
+> open `https://localhost:8443/` once and click through the warning — you'll get a
+> `404` page, which means the WSS endpoint works; the cert exception then lets the
+> WebSocket connect.
+
+Open `https://localhost:8081/` and register as `webrtc@rig.local` / `webrtc123`.
+The WSS server defaults to `wss://localhost:8443` (Kamailio's WSS port is published
+to the host; the cert is valid for `localhost`). Call `moh`, `voicemail`, `ivr`,
+`attendant`, `ooo`, or another subscriber (`alice` / `bob`).
+
+### Softphone
+
+All SIP/RTP ports are published to `localhost`, so point a softphone at
+`localhost:5060` (UDP/TCP) or `localhost:5061` (TLS), domain `rig.local`, as
+`alice@rig.local` / `bob@rig.local`. Seeded passwords are in
 `kamailio/initdb.d/10-seed.sql`.
+
+> **macOS / Windows:** reach the rig via these **published `localhost` ports** —
+> the docker container IPs (`172.30.10.x`) are not routable from the host. On
+> **Linux** you can instead hit the container IPs directly and map
+> `kamailio.rig.local` → `172.30.10.10` in `/etc/hosts`.
 
 To exercise the full Sipfront path locally, run one agent against a personal dev
 pool (set `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`):
