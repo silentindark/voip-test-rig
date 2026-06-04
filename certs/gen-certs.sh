@@ -48,7 +48,7 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = kamailio.${SIP_DOMAIN}
 DNS.2 = webapp.${SIP_DOMAIN}
-DNS.3 = freeswitch.${SIP_DOMAIN}
+DNS.3 = asterisk.${SIP_DOMAIN}
 DNS.4 = localhost
 IP.1  = ${KAMAILIO_EXT_IP}
 IP.2  = ${WEBAPP_EXT_IP}
@@ -67,4 +67,4 @@ rm -f "${srv_csr}" "${ext}" "${out}/ca.srl"
 echo "==> Done. Files in ${out}:"
 ls -1 "${out}"
 echo
-echo "SANs: kamailio.${SIP_DOMAIN}, webapp.${SIP_DOMAIN}, freeswitch.${SIP_DOMAIN}, ${KAMAILIO_EXT_IP}, ${WEBAPP_EXT_IP}"
+echo "SANs: kamailio.${SIP_DOMAIN}, webapp.${SIP_DOMAIN}, asterisk.${SIP_DOMAIN}, ${KAMAILIO_EXT_IP}, ${WEBAPP_EXT_IP}"

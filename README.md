@@ -10,7 +10,7 @@ Docker and tests it end-to-end with [Sipfront](https://sipfront.com).
                    ┌──────────────────────── GitHub runner ───────────────────────┐
                    │                                                               │
   Sipfront cloud   │   external net (172.30.10.0/24)     internal net (.20.0/24)   │
-  (dev) ◀── MQTT ──┼─▶ sf-agent ─SIP/RTP─▶ kamailio ─────────▶ freeswitch          │
+  (dev) ◀── MQTT ──┼─▶ sf-agent ─SIP/RTP─▶ kamailio ─────────▶ asterisk           │
        443         │   (bridge mode)        │   ▲                  ▲                │
                    │                        │   │ ng:2223          │ media          │
                    │   webapp ──WSS────────▶┘   └─▶ rtpengine ◀────┘                │
@@ -21,9 +21,9 @@ Docker and tests it end-to-end with [Sipfront](https://sipfront.com).
 
 - **kamailio** — SIP proxy: registration, MySQL digest auth, location lookup, and
   routing. Special service URIs (`moh`, `voicemail`, `ivr`, `attendant`, `ooo`) are
-  routed to FreeSWITCH. Terminates WSS for the web client.
-- **freeswitch** — application/announcement server (music-on-hold, voicemail, IVR /
-  auto-attendant, out-of-office).
+  routed to Asterisk. Terminates WSS for the web client.
+- **asterisk** — application/announcement server (music-on-hold, voicemail, IVR /
+  auto-attendant, out-of-office), installed straight from the Debian archive.
 - **rtpengine** — media relay; **bridges RTP between the external and internal
   networks** so signaling and media topologies stay separate. Runs userspace-only.
 - **webapp** — a minimal [sip.js](https://sipjs.com) SIP-over-WebRTC client served
@@ -40,7 +40,7 @@ component that bridges media across the boundary.
    - `kamailio/kamailio.cfg`, `kamailio/tls.cfg` — proxy routing / auth / TLS
    - `kamailio/initdb.d/*.sql` — subscribers and DB schema
    - `rtpengine/rtpengine.conf` — media relay
-   - `freeswitch/dialplan/*.xml`, `freeswitch/sip_profiles/*.xml` — app logic
+   - `asterisk/extensions.conf`, `asterisk/pjsip.conf` — app logic
    - `webapp/www/*` — the WebRTC client
    - `docker-compose.yml` — topology
 2. Commit and push.
@@ -68,23 +68,22 @@ them and trusted, so they accept the rig's TLS/WSS.
 | --- | --- |
 | `SF_API_PUBLIC_KEY` / `SF_API_SECRET_KEY` | Trigger the test via `action-call-test` |
 | `SF_POOL_ID` / `SF_POOL_SECRET` | The dev agent pool the in-runner agents join |
-| `SIGNALWIRE_TOKEN` | Build the FreeSWITCH image (free SignalWire access token) |
 
 The Sipfront test/scenario must already exist on dev and be bound to that pool.
 
 ## Run it locally
 
 ```bash
-cp .env.example .env          # set SIGNALWIRE_TOKEN at minimum
+cp .env.example .env          # optional; sensible defaults are built in
 bash certs/gen-certs.sh       # writes certs/out/{ca.crt,server.key,server.crt}
 docker compose up -d --build
 bash scripts/wait-for-rig.sh
 ```
 
 > Kamailio (6.0) and rtpengine (mr26.0) build on Debian `stable` (currently
-> trixie). If the SignalWire repo hasn't published FreeSWITCH packages for the
-> current `stable` codename yet, set `FREESWITCH_DEBIAN_TAG=bookworm-slim` in
-> `.env` — it only affects the FreeSWITCH image.
+> trixie) from `deb.kamailio.org`. Asterisk builds on Debian **bullseye** (the
+> last Debian release that ships the asterisk daemon — it was dropped in
+> bookworm+) straight from the archive. No external tokens or accounts needed.
 
 Then point a softphone at `kamailio.rig.local:5060` (add a hosts entry to
 `172.30.10.10`) as `alice@rig.local` / `bob@rig.local`, or open the web client at
@@ -106,7 +105,7 @@ Tear down with `docker compose down -v`.
 
 ## Status / roadmap
 
-- **Phase 1 (current):** SIP register/auth/location, routing to FreeSWITCH service
+- **Phase 1 (current):** SIP register/auth/location, routing to Asterisk service
   URIs, media bridged external↔internal via rtpengine, and a human-usable WSS web
   client.
 - **Phase 2 (planned):** automated in-runner headless-browser WebRTC test so the

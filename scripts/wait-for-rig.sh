@@ -38,7 +38,7 @@ wait_for kamailio "${COMPOSE[@]}" exec -T kamailio kamcmd core.uptime
 rtpengine_ready() { "${COMPOSE[@]}" logs rtpengine 2>&1 | grep -q "Startup complete"; }
 wait_for rtpengine rtpengine_ready
 
-# FreeSWITCH: fs_cli returns 0 once the event socket is accepting
-wait_for freeswitch "${COMPOSE[@]}" exec -T freeswitch fs_cli -x status
+# Asterisk: the CLI answers on the control socket once it's fully booted
+wait_for asterisk "${COMPOSE[@]}" exec -T asterisk asterisk -rx "core show uptime"
 
 echo "rig is ready"

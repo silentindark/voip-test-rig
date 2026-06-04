@@ -2,7 +2,7 @@
 #
 #   external (172.30.10.0/24): agents (launched separately), kamailio sig leg,
 #                              rtpengine ext media leg, webapp
-#   internal (172.30.20.0/24): kamailio int leg, freeswitch, rtpengine int media
+#   internal (172.30.20.0/24): kamailio int leg, asterisk, rtpengine int media
 #                              leg + ng-control, mysql
 #
 # Service IPs are FIXED and must match kamailio/kamailio.cfg,
@@ -62,15 +62,13 @@ services:
     ports:
       - "30000-30100:30000-30100/udp"
 
-  freeswitch:
+  asterisk:
     build:
-      context: ./freeswitch
+      context: ./asterisk
       args:
-        # FreeSWITCH gets its own Debian tag knob: if the SignalWire repo hasn't
-        # published the current `stable` codename yet, pin FREESWITCH_DEBIAN_TAG
-        # (e.g. bookworm-slim) without affecting the other images.
-        DEBIAN_TAG: ${FREESWITCH_DEBIAN_TAG:-${DEBIAN_TAG:-stable-slim}}
-        SIGNALWIRE_TOKEN: ${SIGNALWIRE_TOKEN:?set SIGNALWIRE_TOKEN in .env or the environment}
+        # bullseye, not the global trixie tag: Debian only ships the asterisk
+        # daemon up to bullseye (removed in bookworm+).
+        DEBIAN_TAG: ${ASTERISK_DEBIAN_TAG:-bullseye-slim}
     networks:
       internal:
         ipv4_address: 172.30.20.30

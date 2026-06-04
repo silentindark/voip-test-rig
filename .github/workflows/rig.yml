@@ -1,6 +1,6 @@
 name: VoIP rig CI
 
-# Edit any config (kamailio.cfg, rtpengine.conf, freeswitch/*, webapp/*, …) and
+# Edit any config (kamailio.cfg, rtpengine.conf, asterisk/*, webapp/*, …) and
 # push: this stands up the full rig, launches Sipfront agents into it, and runs
 # a Sipfront test/project against it.
 on:
@@ -40,8 +40,6 @@ jobs:
         run: bash certs/gen-certs.sh
 
       - name: Build and start the rig
-        env:
-          SIGNALWIRE_TOKEN: ${{ secrets.SIGNALWIRE_TOKEN }}
         run: docker compose up -d --build
 
       - name: Wait for the rig to be ready
