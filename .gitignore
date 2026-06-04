@@ -1,0 +1,9 @@
+# Generated certificates (created on-demand by certs/gen-certs.sh)
+certs/out/
+
+# Local env overrides
+.env
+
+# Editor / OS noise
+*.swp
+.DS_Store

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>voip-test-rig — WebRTC SIP client</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.3rem; }
+    fieldset { border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1rem; }
+    label { display: inline-block; width: 7rem; }
+    input { width: 18rem; padding: 0.2rem; margin: 0.15rem 0; }
+    button { padding: 0.4rem 0.9rem; margin-right: 0.4rem; cursor: pointer; }
+    #status { font-weight: bold; }
+    #log { background: #111; color: #0f0; font-family: monospace; font-size: 0.8rem;
+           height: 12rem; overflow-y: auto; padding: 0.5rem; border-radius: 6px; white-space: pre-wrap; }
+    .targets button { background: #eef; }
+  </style>
+</head>
+<body>
+  <h1>voip-test-rig — SIP over WebRTC (sip.js)</h1>
+  <p>Status: <span id="status">disconnected</span></p>
+
+  <fieldset>
+    <legend>Account</legend>
+    <div><label for="server">WSS server</label><input id="server" value="wss://kamailio.rig.local:8443"/></div>
+    <div><label for="domain">SIP domain</label><input id="domain" value="rig.local"/></div>
+    <div><label for="user">Username</label><input id="user" value="webrtc"/></div>
+    <div><label for="pass">Password</label><input id="pass" type="password" value="webrtc123"/></div>
+    <div><button id="btnRegister">Connect &amp; Register</button>
+         <button id="btnUnregister">Disconnect</button></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Place a call</legend>
+    <div><label for="target">Target</label><input id="target" value="moh"/></div>
+    <div class="targets">
+      <button data-t="moh">moh</button>
+      <button data-t="voicemail">voicemail</button>
+      <button data-t="ivr">ivr</button>
+      <button data-t="attendant">attendant</button>
+      <button data-t="ooo">ooo</button>
+      <button data-t="alice">alice</button>
+      <button data-t="bob">bob</button>
+    </div>
+    <div style="margin-top:0.5rem">
+      <button id="btnCall">Call</button>
+      <button id="btnHangup">Hang up</button>
+    </div>
+  </fieldset>
+
+  <audio id="remoteAudio" autoplay></audio>
+  <div id="log"></div>
+
+  <!-- sip.js UMD bundle (provides SIP.Web.SimpleUser) -->
+  <script src="https://cdn.jsdelivr.net/npm/sip.js@0.21.2/dist/sip.min.js"></script>
+  <script src="js/sipclient.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+# voip-test-rig — full stack across two networks.
+#
+#   external (172.30.10.0/24): agents (launched separately), kamailio sig leg,
+#                              rtpengine ext media leg, webapp
+#   internal (172.30.20.0/24): kamailio int leg, freeswitch, rtpengine int media
+#                              leg + ng-control, mysql
+#
+# Service IPs are FIXED and must match kamailio/kamailio.cfg,
+# rtpengine/rtpengine.conf, and the SANs in certs/gen-certs.sh.
+
+services:
+  mysql:
+    image: mysql:${MYSQL_TAG:-8}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rigrootpw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-kamailio}
+      MYSQL_USER: ${MYSQL_USER:-kamailio}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-kamailiopw}
+    volumes:
+      - ./kamailio/initdb.d:/docker-entrypoint-initdb.d:ro
+    networks:
+      internal:
+        ipv4_address: 172.30.20.40
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-rigrootpw}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  kamailio:
+    build:
+      context: ./kamailio
+      args:
+        DEBIAN_TAG: ${DEBIAN_TAG:-stable-slim}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./certs/out:/rig-certs:ro
+    networks:
+      external:
+        ipv4_address: 172.30.10.10
+      internal:
+        ipv4_address: 172.30.20.10
+    # Published for optional local dev (a host softphone / browser). Not used in CI.
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+      - "8443:8443/tcp"
+
+  rtpengine:
+    build:
+      context: ./rtpengine
+      args:
+        DEBIAN_TAG: ${DEBIAN_TAG:-stable-slim}
+    networks:
+      external:
+        ipv4_address: 172.30.10.20
+      internal:
+        ipv4_address: 172.30.20.20
+    ports:
+      - "30000-30100:30000-30100/udp"
+
+  freeswitch:
+    build:
+      context: ./freeswitch
+      args:
+        # FreeSWITCH gets its own Debian tag knob: if the SignalWire repo hasn't
+        # published the current `stable` codename yet, pin FREESWITCH_DEBIAN_TAG
+        # (e.g. bookworm-slim) without affecting the other images.
+        DEBIAN_TAG: ${FREESWITCH_DEBIAN_TAG:-${DEBIAN_TAG:-stable-slim}}
+        SIGNALWIRE_TOKEN: ${SIGNALWIRE_TOKEN:?set SIGNALWIRE_TOKEN in .env or the environment}
+    networks:
+      internal:
+        ipv4_address: 172.30.20.30
+
+  webapp:
+    build:
+      context: ./webapp
+      args:
+        NGINX_TAG: ${NGINX_TAG:-alpine}
+    volumes:
+      - ./certs/out:/rig-certs:ro
+    networks:
+      external:
+        ipv4_address: 172.30.10.50
+    ports:
+      - "8081:443"
+
+networks:
+  external:
+    name: rig-external
+    ipam:
+      config:
+        - subnet: ${EXTERNAL_SUBNET:-172.30.10.0/24}
+  internal:
+    name: rig-internal
+    ipam:
+      config:
+        - subnet: ${INTERNAL_SUBNET:-172.30.20.0/24}

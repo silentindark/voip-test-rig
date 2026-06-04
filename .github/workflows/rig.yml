@@ -1,0 +1,120 @@
+name: VoIP rig CI
+
+# Edit any config (kamailio.cfg, rtpengine.conf, freeswitch/*, webapp/*, …) and
+# push: this stands up the full rig, launches Sipfront agents into it, and runs
+# a Sipfront test/project against it.
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "test or project"
+        type: choice
+        options: [test, project]
+        default: test
+      name:
+        description: "Sipfront test name (mode=test)"
+        default: voip-test-rig
+      project_name:
+        description: "Sipfront project name (mode=project)"
+        default: ""
+
+env:
+  # The dev agent pool the in-runner agents register to, and the test to trigger.
+  SF_IOTCORE_HOST: mqtt.dev.sipfront.net
+  AGENT_COUNT: "2"
+  TEST_MODE: ${{ github.event.inputs.mode || 'test' }}
+  TEST_NAME: ${{ github.event.inputs.name || 'voip-test-rig' }}
+  PROJECT_NAME: ${{ github.event.inputs.project_name || '' }}
+
+jobs:
+  rig:
+    name: Build rig, run agents, test with Sipfront
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate on-demand CA + server certs
+        run: bash certs/gen-certs.sh
+
+      - name: Build and start the rig
+        env:
+          SIGNALWIRE_TOKEN: ${{ secrets.SIGNALWIRE_TOKEN }}
+        run: docker compose up -d --build
+
+      - name: Wait for the rig to be ready
+        run: bash scripts/wait-for-rig.sh
+
+      - name: Launch Sipfront agents into the external network
+        env:
+          SF_POOL_ID: ${{ secrets.SF_POOL_ID }}
+          SF_POOL_SECRET: ${{ secrets.SF_POOL_SECRET }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 "${AGENT_COUNT}"); do
+            echo "::group::start sf-agent-${i}"
+            docker run -d --init --pull always \
+              --name "sf-agent-${i}" --hostname "sf-agent-${i}" \
+              --network rig-external \
+              -e SF_POOL_ID="${SF_POOL_ID}" \
+              -e SF_POOL_SECRET="${SF_POOL_SECRET}" \
+              -e SF_IOTCORE_HOST="${SF_IOTCORE_HOST}" \
+              -v "${PWD}/certs/out/ca.crt:/usr/local/share/ca-certificates/rig-ca.crt:ro" \
+              --add-host "kamailio.rig.local:172.30.10.10" \
+              --add-host "webapp.rig.local:172.30.10.50" \
+              sipfront/agent:latest
+            # Trust the rig's CA for the agent's TLS/WSS legs (non-fatal).
+            docker exec "sf-agent-${i}" update-ca-certificates >/dev/null 2>&1 \
+              || echo "warn: could not refresh CA store in sf-agent-${i}"
+            echo "::endgroup::"
+          done
+
+      - name: Settle (let agents connect to the Sipfront cloud)
+        run: sleep 25
+
+      - name: Run Sipfront test
+        id: sipfront
+        uses: sipfront/action-call-test@d5cce5b9876a0bdf69642560d8e317f6b2309402
+        with:
+          public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
+          secret_key: ${{ secrets.SF_API_SECRET_KEY }}
+          sf_environment: dev
+          mode: ${{ env.TEST_MODE }}
+          name: ${{ env.TEST_NAME }}
+          project_name: ${{ env.PROJECT_NAME }}
+          report_mode: kiosk
+
+      - name: Report
+        if: ${{ !cancelled() && steps.sipfront.outputs.report_url != '' }}
+        run: |
+          echo "Status: ${{ steps.sipfront.outputs.status }}"
+          echo "Report: ${{ steps.sipfront.outputs.report_url }}"
+          {
+            echo "### Sipfront rig test: ${{ steps.sipfront.outputs.status }}"
+            echo "[View report](${{ steps.sipfront.outputs.report_url }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect logs
+        if: ${{ always() }}
+        run: |
+          mkdir -p rig-logs
+          docker compose logs --no-color > rig-logs/compose.log 2>&1 || true
+          for i in $(seq 1 "${AGENT_COUNT}"); do
+            docker logs "sf-agent-${i}" > "rig-logs/sf-agent-${i}.log" 2>&1 || true
+          done
+
+      - name: Upload logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rig-logs
+          path: rig-logs/
+          if-no-files-found: ignore
+
+      - name: Tear down
+        if: ${{ always() }}
+        run: |
+          for i in $(seq 1 "${AGENT_COUNT}"); do docker rm -f "sf-agent-${i}" || true; done
+          docker compose down -v || true
