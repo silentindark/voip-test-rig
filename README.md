@@ -74,34 +74,46 @@ The Sipfront test/scenario must already exist on dev and be bound to that pool.
 ## Run it locally
 
 ```bash
-cp .env.example .env          # optional; sensible defaults are built in
-bash certs/gen-certs.sh       # writes certs/out/{ca.crt,server.key,server.crt}
-docker compose up -d --build
-bash scripts/wait-for-rig.sh
+make run     # generate certs, build images, start the rig, wait until ready
+make stop    # stop and remove the rig (containers, networks, volumes)
 ```
+
+`make` (or `make help`) lists everything:
+
+| Target | What it does |
+| --- | --- |
+| `make run` (`up`) | Generate certs (if missing), `docker compose up -d --build`, wait for readiness |
+| `make stop` | `docker compose down -v` |
+| `make down` | `stop` + also remove any local `sf-agent-*` containers |
+| `make restart` | `down` then `run` |
+| `make build` | Build all images |
+| `make logs` | Follow logs from all services |
+| `make ps` | Show container status |
+| `make agent` | Run one Sipfront agent locally on the external net (needs `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`) |
+| `make certs` / `regen-certs` | Generate / force-regenerate the CA + server cert |
+| `make clean` | `down` + delete `certs/out` |
+
+Copy `.env.example` to `.env` first if you want to override defaults (subnets,
+passwords) or use `make agent`.
 
 > Kamailio (6.0) and rtpengine (mr26.0) build on Debian `stable` (currently
 > trixie) from `deb.kamailio.org`. Asterisk builds on Debian **bullseye** (the
 > last Debian release that ships the asterisk daemon — it was dropped in
 > bookworm+) straight from the archive. No external tokens or accounts needed.
 
-Then point a softphone at `kamailio.rig.local:5060` (add a hosts entry to
+Once it's up, point a softphone at `kamailio.rig.local:5060` (add a hosts entry to
 `172.30.10.10`) as `alice@rig.local` / `bob@rig.local`, or open the web client at
-`https://172.30.10.50/` (trust `certs/out/ca.crt`) and register as `webrtc@rig.local`.
-Call `moh@rig.local`, `voicemail@rig.local`, `ivr@rig.local`, `ooo@rig.local`, or
-another subscriber. Seeded test passwords are in `kamailio/initdb.d/10-seed.sql`.
+`https://localhost:8081/` (trust `certs/out/ca.crt`) and register as
+`webrtc@rig.local`. Call `moh@rig.local`, `voicemail@rig.local`, `ivr@rig.local`,
+`ooo@rig.local`, or another subscriber. Seeded test passwords are in
+`kamailio/initdb.d/10-seed.sql`.
 
-To exercise the full Sipfront path locally, run one agent against a personal dev pool:
+To exercise the full Sipfront path locally, run one agent against a personal dev
+pool (set `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`):
 
 ```bash
-docker run --init --pull always --network rig-external \
-  -e SF_POOL_ID=... -e SF_POOL_SECRET=... -e SF_IOTCORE_HOST=mqtt.dev.sipfront.net \
-  -v "$PWD/certs/out/ca.crt:/usr/local/share/ca-certificates/rig-ca.crt:ro" \
-  --add-host kamailio.rig.local:172.30.10.10 \
-  sipfront/agent:latest
+make agent
 ```
-
-Tear down with `docker compose down -v`.
 
 ## Status / roadmap
 
