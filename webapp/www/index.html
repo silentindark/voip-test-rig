@@ -52,8 +52,7 @@
   <audio id="remoteAudio" autoplay></audio>
   <div id="log"></div>
 
-  <!-- sip.js UMD bundle (provides SIP.Web.SimpleUser) -->
-  <script src="https://cdn.jsdelivr.net/npm/sip.js@0.21.2/dist/sip.min.js"></script>
-  <script src="js/sipclient.js"></script>
+  <!-- sip.js is ESM-only (no UMD bundle); sipclient.js imports it as a module -->
+  <script type="module" src="js/sipclient.js"></script>
 </body>
 </html>

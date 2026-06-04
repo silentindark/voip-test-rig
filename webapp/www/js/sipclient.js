@@ -1,9 +1,12 @@
 /*
  * Minimal SIP-over-WebRTC client for the rig, built on sip.js SimpleUser.
  * Registers to Kamailio over WSS and places calls to rig subscribers or the
- * FreeSWITCH service URIs (moh / voicemail / ivr / attendant / ooo).
+ * Asterisk service URIs (moh / voicemail / ivr / attendant / ooo).
+ *
+ * sip.js 0.21 ships as ES modules only, so we import it (jsdelivr serves an
+ * ESM bundle via the +esm endpoint) rather than relying on a UMD global.
  */
-'use strict';
+import { Web } from 'https://cdn.jsdelivr.net/npm/sip.js@0.21.2/+esm';
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -50,7 +53,7 @@ async function register() {
   };
 
   try {
-    simpleUser = new SIP.Web.SimpleUser(server, options);
+    simpleUser = new Web.SimpleUser(server, options);
     setStatus('connecting…');
     log(`connecting to ${server}`);
     await simpleUser.connect();
