@@ -49,17 +49,10 @@ logs: ## Follow logs from all rig services
 ps: ## Show rig container status
 	docker compose ps
 
-agent: ## Run one Sipfront agent locally on the external net (needs SF_POOL_ID/SECRET in .env)
-	@test -n "$(SF_POOL_ID)" || { echo "set SF_POOL_ID and SF_POOL_SECRET in .env first"; exit 1; }
-	docker run --rm --init --pull always \
-	  --name sf-agent-local --network rig-external \
-	  -e SF_POOL_ID="$(SF_POOL_ID)" \
-	  -e SF_POOL_SECRET="$(SF_POOL_SECRET)" \
-	  -e SF_IOTCORE_HOST="$(SF_IOTCORE_HOST)" \
-	  -v "$(CURDIR)/certs/out/ca.crt:/usr/local/share/ca-certificates/rig-ca.crt:ro" \
-	  --add-host kamailio.rig.local:172.30.10.10 \
-	  --add-host webapp.rig.local:172.30.10.50 \
-	  sipfront/agent:latest
+AGENTS ?= 2
+agent: ## Launch AGENTS Sipfront agents on the external net (needs SF_POOL_ID/SECRET in .env)
+	bash scripts/launch-agents.sh $(AGENTS)
+	@echo "Logs: docker logs -f sf-agent-1"
 
 clean: down ## Stop everything and delete generated certs
 	rm -rf certs/out

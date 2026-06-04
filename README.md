@@ -51,13 +51,18 @@ component that bridges media across the boundary.
 
 ## How testing works
 
-Sipfront agents are launched in the runner from the public `sipfront/agent:latest`
-image, attached to the **external** docker network in bridge mode (which also
-exercises Kamailio's far-end NAT handling). They dial **out** to the Sipfront dev
-cloud over MQTT and register to a private **agent pool**. A pre-defined Sipfront test —
-bound to that pool — is then triggered via the
-[`sipfront/action-call-test`](https://github.com/sipfront/action-call-test) action;
-the cloud backend drives the agents to REGISTER and place calls against the rig.
+Once the rig is up, `scripts/launch-agents.sh` starts two `sipfront/agent:latest`
+containers on the **external** docker network (with `SF_FORCE_LOCAL_IP=1` so each
+advertises its docker IP — routable inside the rig). They dial **out** to the
+Sipfront dev cloud over MQTT and register to a private **agent pool**. The CI
+workflow then triggers two pre-defined Sipfront tests via the
+[`sipfront/action-call-test`](https://github.com/sipfront/action-call-test) action:
+
+- **basic call alice to bob** — agent-to-agent call routed by Kamailio.
+- **basic call alice to asterisk-ooo** — call to a FreeSWITCH/Asterisk service URI.
+
+The cloud backend drives the agents to REGISTER and place those calls against the
+rig. (No project run yet — that's a later addition.)
 
 Because the agents are local containers, the on-demand CA we generate is mounted into
 them and trusted, so they accept the rig's TLS/WSS.
@@ -69,7 +74,8 @@ them and trusted, so they accept the rig's TLS/WSS.
 | `SF_API_PUBLIC_KEY` / `SF_API_SECRET_KEY` | Trigger the test via `action-call-test` |
 | `SF_POOL_ID` / `SF_POOL_SECRET` | The dev agent pool the in-runner agents join |
 
-The Sipfront test/scenario must already exist on dev and be bound to that pool.
+The two test scenarios (`basic call alice to bob`, `basic call alice to
+asterisk-ooo`) must already exist on dev and be bound to that pool.
 
 ## Run it locally
 

@@ -1,32 +1,16 @@
 name: VoIP rig CI
 
 # Edit any config (kamailio.cfg, rtpengine.conf, asterisk/*, webapp/*, …) and
-# push: this stands up the full rig, launches Sipfront agents into it, and runs
-# a Sipfront test/project against it.
+# push (or open a PR): this stands up the full rig, launches Sipfront agents
+# into it, and runs the rig's Sipfront tests against it.
 on:
   push:
     branches: ["**"]
+  pull_request:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: "test or project"
-        type: choice
-        options: [test, project]
-        default: test
-      name:
-        description: "Sipfront test name (mode=test)"
-        default: voip-test-rig
-      project_name:
-        description: "Sipfront project name (mode=project)"
-        default: ""
 
 env:
-  # The dev agent pool the in-runner agents register to, and the test to trigger.
-  SF_IOTCORE_HOST: mqtt.dev.sipfront.net
   AGENT_COUNT: "2"
-  TEST_MODE: ${{ github.event.inputs.mode || 'test' }}
-  TEST_NAME: ${{ github.event.inputs.name || 'voip-test-rig' }}
-  PROJECT_NAME: ${{ github.event.inputs.project_name || '' }}
 
 jobs:
   rig:
@@ -45,53 +29,47 @@ jobs:
       - name: Wait for the rig to be ready
         run: bash scripts/wait-for-rig.sh
 
-      - name: Launch Sipfront agents into the external network
+      # All rig containers are up — now launch the agents into the external net.
+      - name: Launch Sipfront agents
         env:
           SF_POOL_ID: ${{ secrets.SF_POOL_ID }}
           SF_POOL_SECRET: ${{ secrets.SF_POOL_SECRET }}
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 "${AGENT_COUNT}"); do
-            echo "::group::start sf-agent-${i}"
-            docker run -d --init --pull always \
-              --name "sf-agent-${i}" --hostname "sf-agent-${i}" \
-              --network rig-external \
-              -e SF_POOL_ID="${SF_POOL_ID}" \
-              -e SF_POOL_SECRET="${SF_POOL_SECRET}" \
-              -e SF_IOTCORE_HOST="${SF_IOTCORE_HOST}" \
-              -v "${PWD}/certs/out/ca.crt:/usr/local/share/ca-certificates/rig-ca.crt:ro" \
-              --add-host "kamailio.rig.local:172.30.10.10" \
-              --add-host "webapp.rig.local:172.30.10.50" \
-              sipfront/agent:latest
-            # Trust the rig's CA for the agent's TLS/WSS legs (non-fatal).
-            docker exec "sf-agent-${i}" update-ca-certificates >/dev/null 2>&1 \
-              || echo "warn: could not refresh CA store in sf-agent-${i}"
-            echo "::endgroup::"
-          done
+        run: bash scripts/launch-agents.sh "${AGENT_COUNT}"
 
       - name: Settle (let agents connect to the Sipfront cloud)
         run: sleep 25
 
-      - name: Run Sipfront test
-        id: sipfront
+      - name: Test — basic call alice to bob
+        id: test_ab
+        if: ${{ !cancelled() }}
         uses: sipfront/action-call-test@d5cce5b9876a0bdf69642560d8e317f6b2309402
         with:
           public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
           secret_key: ${{ secrets.SF_API_SECRET_KEY }}
           sf_environment: dev
-          mode: ${{ env.TEST_MODE }}
-          name: ${{ env.TEST_NAME }}
-          project_name: ${{ env.PROJECT_NAME }}
+          mode: test
+          name: basic call alice to bob
+          report_mode: kiosk
+
+      - name: Test — basic call alice to asterisk-ooo
+        id: test_ooo
+        if: ${{ !cancelled() }}
+        uses: sipfront/action-call-test@d5cce5b9876a0bdf69642560d8e317f6b2309402
+        with:
+          public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
+          secret_key: ${{ secrets.SF_API_SECRET_KEY }}
+          sf_environment: dev
+          mode: test
+          name: basic call alice to asterisk-ooo
           report_mode: kiosk
 
       - name: Report
-        if: ${{ !cancelled() && steps.sipfront.outputs.report_url != '' }}
+        if: ${{ !cancelled() }}
         run: |
-          echo "Status: ${{ steps.sipfront.outputs.status }}"
-          echo "Report: ${{ steps.sipfront.outputs.report_url }}"
           {
-            echo "### Sipfront rig test: ${{ steps.sipfront.outputs.status }}"
-            echo "[View report](${{ steps.sipfront.outputs.report_url }})"
+            echo "### Sipfront rig tests"
+            echo "- **alice → bob**: ${{ steps.test_ab.outputs.status || 'n/a' }} — ${{ steps.test_ab.outputs.report_url }}"
+            echo "- **alice → asterisk-ooo**: ${{ steps.test_ooo.outputs.status || 'n/a' }} — ${{ steps.test_ooo.outputs.report_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
