@@ -21,7 +21,8 @@ certs/out/server.crt:
 
 certs: certs/out/server.crt ## Generate the CA + server cert (only if missing)
 
-regen-certs: ## Force-regenerate the CA + server cert
+regen-certs: ## Force-regenerate the CA + server cert (new CA -> browser re-accept)
+	rm -rf certs/out
 	bash certs/gen-certs.sh
 
 build: certs ## Build all rig images
