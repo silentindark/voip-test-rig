@@ -13,10 +13,12 @@ on:
         description: "Number of Sipfront agents to launch"
         default: "2"
 
-# A new run cancels any still-running run for the same branch/PR (avoids two
-# rigs fighting over the same agent pool).
+# A new run cancels any still-running run for the same branch (avoids two rigs
+# fighting over the same agent pool). Keyed on the branch NAME (head_ref on a
+# PR, ref_name on a push) so the push and pull_request events for the same
+# branch share one group and don't run two rigs in parallel.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 env:
