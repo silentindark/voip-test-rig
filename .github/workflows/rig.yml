@@ -1,22 +1,25 @@
 name: VoIP rig CI
 
 # Edit any config (kamailio.cfg, rtpengine.conf, asterisk/*, webapp/*, …) and
-# push (or open a PR): this stands up the full rig, launches Sipfront agents
-# into it, and runs the rig's Sipfront tests against it.
+# push: this stands up the full rig, launches Sipfront agents into it, and runs
+# the rig's Sipfront tests against it.
+#
+# Push only (no pull_request): a PR on a same-repo branch would otherwise trigger
+# a second run that the concurrency group cancels, and a cancelled run is
+# reported as a failed check on the PR. One run per push keeps the status clean.
 on:
   push:
     branches: ["**"]
-  pull_request:
   workflow_dispatch:        # manual "Run workflow" button
     inputs:
       agent_count:
         description: "Number of Sipfront agents to launch"
         default: "2"
 
-# A new run cancels any still-running run for the same branch/PR (avoids two
-# rigs fighting over the same agent pool).
+# A new push cancels any still-running run for the same branch (avoids two rigs
+# fighting over the same agent pool).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:

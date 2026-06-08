@@ -1,5 +1,7 @@
 # voip-test-rig
 
+[![Sipfront VoIP Rig CI Tests](https://github.com/sipfront/voip-test-rig/actions/workflows/rig.yml/badge.svg)](https://github.com/sipfront/voip-test-rig/actions/workflows/rig.yml)
+
 A self-contained, **CI/CD-tested** VoIP microservice stack. Everything that defines
 the system — the SIP proxy routing, the media relay, the application/announcement
 logic, the WebRTC web client, and the subscriber database — lives as **plain editable
