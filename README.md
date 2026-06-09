@@ -71,6 +71,16 @@ rig; the CI job fails if any test in the project run fails.
 Because the agents are local containers, the on-demand CA we generate is mounted into
 them and trusted, so they accept the rig's TLS/WSS.
 
+### Browser (WebRTC) tests
+
+The CI also launches a **browser agent** (`scripts/launch-webrtc-agent.sh`): a
+Selenium Chrome container plus a `sipfront/agent-selenium` agent joined to pool-group
+**`webrtc`**. The Sipfront cloud routes browser steps to that group, so they run a real
+Chrome that loads the rig's sip.js web client (`webapp/`), registers `webrtc@rig.local`
+over WSS, and places a call — exercising the WebRTC ⇄ SIP bridging end to end. The
+reference CodeceptJS scripts and the steps to wire up the cloud test live in
+[`tests/webrtc/`](tests/webrtc/).
+
 ### Required GitHub secrets
 
 | Secret | Purpose |
@@ -100,6 +110,7 @@ make stop    # stop and remove the rig (containers, networks, volumes)
 | `make logs` | Follow logs from all services |
 | `make ps` | Show container status |
 | `make agent` | Run one Sipfront agent locally on the external net (needs `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`) |
+| `make webrtc-agent` | Run a browser (WebRTC) agent + Selenium in group `webrtc` (needs `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`) |
 | `make certs` / `regen-certs` | Generate / force-regenerate the CA + server cert |
 | `make clean` | `down` + delete `certs/out` |
 
