@@ -2,11 +2,14 @@
 
 [![Sipfront VoIP Rig CI Tests](https://github.com/sipfront/voip-test-rig/actions/workflows/rig.yml/badge.svg)](https://github.com/sipfront/voip-test-rig/actions/workflows/rig.yml)
 
-A self-contained, **CI/CD-tested** VoIP microservice stack. Everything that defines
-the system — the SIP proxy routing, the media relay, the application/announcement
-logic, the WebRTC web client, and the subscriber database — lives as **plain editable
-files in this repo**. Push a change and a GitHub runner stands the whole rig up in
-Docker and tests it end-to-end with [Sipfront](https://sipfront.com).
+A **reference implementation of a typical telco stack** — Kamailio, Asterisk,
+rtpengine, MySQL and a [sip.js](https://sipjs.com) WebRTC client — wired so the
+whole thing is **automatically tested in a throwaway GitHub runner on every push**,
+using [Sipfront](https://sipfront.com) agents for both **SIP and WebRTC**.
+
+Everything that defines the system lives as **plain editable files in this repo**.
+Push a change and a runner stands the rig up in Docker, launches Sipfront test
+agents into it, runs the full test suite end-to-end, and tears it all down.
 
 ```
                    ┌──────────────────────── GitHub runner ─────────────────────────┐
@@ -21,153 +24,91 @@ Docker and tests it end-to-end with [Sipfront](https://sipfront.com).
                    └────────────────────────────────────────────────────────────────┘
 ```
 
-- **kamailio** — SIP proxy: registration, MySQL digest auth, location lookup, and
-  routing. Special service URIs (`moh`, `voicemail`, `ivr`, `attendant`, `ooo`) are
-  routed to Asterisk. Terminates WSS for the web client.
+## Components
+
+- **kamailio** — SIP proxy: registration, MySQL digest auth, location lookup. Forces
+  **every** call through Asterisk so the app server owns the media path, and terminates
+  WSS for the web client.
 - **asterisk** — application/announcement server (music-on-hold, voicemail, IVR /
-  auto-attendant, out-of-office), installed straight from the Debian archive.
-- **rtpengine** — media relay; **bridges RTP between the external and internal
-  networks** so signaling and media topologies stay separate. Runs userspace-only.
-- **webapp** — a minimal [sip.js](https://sipjs.com) SIP-over-WebRTC client served
-  over HTTPS; registers and places calls over WSS to Kamailio.
-- **mysql** — Kamailio's `subscriber` and `location` backend, seeded on first boot.
+  attendant, out-of-office). Sits in the media path for all calls.
+- **rtpengine** — media relay between the two networks. Transcodes endpoint codecs
+  (Opus, G.722, …) to the G.711 Asterisk speaks, and bridges WebRTC DTLS-SRTP ⇄ plain
+  RTP. Userspace-only (`table = -1`), since runners lack the in-kernel module.
+- **webapp** — a minimal sip.js SIP-over-WebRTC client served over HTTPS; registers and
+  calls over WSS to Kamailio.
+- **mysql** — Kamailio's subscriber/location store, seeded on first boot from
+  `kamailio/initdb.d/*.sql`.
 
-The two networks model a typical voice deployment: clients and the web app live on the
-"external" edge, application/DB services live "internal", and rtpengine is the only
-component that bridges media across the boundary.
+Two docker networks model a real deployment: clients and the web app on the
+**external** edge, app/DB services **internal**, with rtpengine the only bridge across.
+The editable surface is the config under `kamailio/`, `rtpengine/`, `asterisk/`,
+`webapp/`, and `docker-compose.yml`.
 
-## The develop → push → test loop
+## How it's tested
 
-1. Edit any of the **editable config surface**:
-   - `kamailio/kamailio.cfg`, `kamailio/tls.cfg` — proxy routing / auth / TLS
-   - `kamailio/initdb.d/*.sql` — subscribers and DB schema
-   - `rtpengine/rtpengine.conf` — media relay
-   - `asterisk/extensions.conf`, `asterisk/pjsip.conf` — app logic
-   - `webapp/www/*` — the WebRTC client
-   - `docker-compose.yml` — topology
-2. Commit and push.
-3. `.github/workflows/rig.yml` runs: it generates certs, brings the rig up, launches
-   Sipfront agents into the external network, and triggers a Sipfront test/project run.
-4. The job summary links to the Sipfront **report** with pass/fail for the
-   REGISTER / INVITE / service-URI scenarios.
+Each push runs `.github/workflows/rig.yml`: generate an on-demand CA + certs →
+`docker compose up` the rig → launch agents → run the Sipfront **`voip-test-rig`
+project** (every test in it) → report pass/fail in the job summary → tear everything
+down. The job fails if any test fails.
 
-## How testing works
+Agents are plain containers on the external network that dial **out** to the Sipfront
+cloud over MQTT and join a private **agent pool**; the cloud then drives them to
+register and place calls against the rig:
 
-Once the rig is up, `scripts/launch-agents.sh` starts two `sipfront/agent:latest`
-containers on the **external** docker network (with `SF_FORCE_LOCAL_IP=1` so each
-advertises its docker IP — routable inside the rig). They dial **out** to the
-Sipfront dev cloud over MQTT and register to a private **agent pool**. The CI
-workflow then runs the whole **`voip-test-rig` project** on Sipfront via the
-[`sipfront/action-call-test`](https://github.com/sipfront/action-call-test) action
-(`mode: project`), which executes every test in the project, e.g.:
+- **Two SIP agents** (`scripts/launch-agents.sh`) for the SIP/RTP tests — basic calls,
+  codecs (Opus/G.722), DTMF, hold/retrieve, TLS scan, etc.
+- **One browser agent** (`scripts/launch-webrtc-agent.sh`) — a Selenium Chrome plus a
+  `sipfront/agent` joined to pool-group **`webrtc`**, which loads the sip.js client in a
+  real browser and places WebRTC calls. It trusts the rig CA and reaches the stack by
+  its cert-valid FQDNs (`webapp.rig.local`, `kamailio.rig.local`). Reference scripts and
+  the cloud-test setup are in [`tests/webrtc/`](tests/webrtc/).
 
-- **basic call alice to bob** — agent-to-agent call, routed by Kamailio through
-  Asterisk (which sits in the media path).
-- **basic call alice to asterisk-ooo** — call to an Asterisk service URI.
-
-The cloud backend drives the agents to REGISTER and place those calls against the
-rig; the CI job fails if any test in the project run fails.
-
-Because the agents are local containers, the on-demand CA we generate is mounted into
-them and trusted, so they accept the rig's TLS/WSS.
-
-### Browser (WebRTC) tests
-
-The CI also launches a **browser agent** (`scripts/launch-webrtc-agent.sh`): a
-Selenium Chrome container plus a `sipfront/agent-selenium` agent joined to pool-group
-**`webrtc`**. The Sipfront cloud routes browser steps to that group, so they run a real
-Chrome that loads the rig's sip.js web client (`webapp/`), registers `webrtc@rig.local`
-over WSS, and places a call — exercising the WebRTC ⇄ SIP bridging end to end. The
-reference CodeceptJS scripts and the steps to wire up the cloud test live in
-[`tests/webrtc/`](tests/webrtc/).
+The on-demand CA is mounted into every agent (and the browser) so they accept the rig's
+self-signed TLS/WSS.
 
 ### Required GitHub secrets
 
 | Secret | Purpose |
 | --- | --- |
-| `SF_API_PUBLIC_KEY` / `SF_API_SECRET_KEY` | Trigger the test via `action-call-test` |
-| `SF_POOL_ID` / `SF_POOL_SECRET` | The dev agent pool the in-runner agents join |
+| `SF_API_PUBLIC_KEY` / `SF_API_SECRET_KEY` | Trigger the project run (`sipfront/action-call-test`) |
+| `SF_POOL_ID` / `SF_POOL_SECRET` | The Sipfront agent pool the in-runner agents join |
 
-The two test scenarios (`basic call alice to bob`, `basic call alice to
-asterisk-ooo`) must already exist on dev and be bound to that pool.
+The `voip-test-rig` project and its tests must already exist on Sipfront and be bound to
+that pool.
 
 ## Run it locally
 
 ```bash
-make run     # generate certs, build images, start the rig, wait until ready
-make stop    # stop and remove the rig (containers, networks, volumes)
+make run            # certs + build + start the rig, wait until ready
+make agent          # launch 2 SIP agents                         (needs SF_POOL_* in .env)
+make webrtc-agent   # launch the WebRTC browser agent + Selenium   (needs SF_POOL_* in .env)
+make agent-logs     # follow an agent (AGENT=sf-agent-1 | sf-agent-webrtc | sf-selenium)
+make down           # stop the rig and remove the agents
 ```
 
-`make` (or `make help`) lists everything:
+`make help` lists every target. Copy `.env.example` to `.env` and set
+`SF_POOL_ID`/`SF_POOL_SECRET` (optionally override subnets/passwords) before launching
+agents.
 
-| Target | What it does |
-| --- | --- |
-| `make run` (`up`) | Generate certs (if missing), `docker compose up -d --build`, wait for readiness |
-| `make stop` | `docker compose down -v` |
-| `make down` | `stop` + also remove any local `sf-agent-*` containers |
-| `make restart` | `down` then `run` |
-| `make build` | Build all images |
-| `make logs` | Follow logs from all services |
-| `make ps` | Show container status |
-| `make agent` | Run one Sipfront agent locally on the external net (needs `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`) |
-| `make webrtc-agent` | Run a browser (WebRTC) agent + Selenium in group `webrtc` (needs `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`) |
-| `make certs` / `regen-certs` | Generate / force-regenerate the CA + server cert |
-| `make clean` | `down` + delete `certs/out` |
+> Build notes: Kamailio (6.0) and rtpengine (mr26.0) build on Debian stable from
+> `deb.kamailio.org`; Asterisk on Debian **bullseye** (the last release shipping the
+> daemon). No external tokens or accounts needed.
 
-Copy `.env.example` to `.env` first if you want to override defaults (subnets,
-passwords) or use `make agent`.
+## Use the rig by hand
 
-> Kamailio (6.0) and rtpengine (mr26.0) build on Debian `stable` (currently
-> trixie) from `deb.kamailio.org`. Asterisk builds on Debian **bullseye** (the
-> last Debian release that ships the asterisk daemon — it was dropped in
-> bookworm+) straight from the archive. No external tokens or accounts needed.
+**Web client** — open `https://localhost:8081/` and register `webrtc@rig.local` /
+`webrtc123` (WSS defaults to `wss://localhost:8443`). Call `moh`, `voicemail`, `ivr`,
+`attendant`, `ooo`, or a subscriber (`alice` / `bob`).
 
-### Web client (browser on the host)
-
-> **Trust the CA first.** The web client signals over **WSS**, and browsers do
-> *not* prompt to accept a self-signed cert on a WebSocket — they just close it
-> (error code `1006`). So you must trust the rig CA up front:
+> **Trust the CA first.** Browsers silently drop a WSS to an untrusted cert (close
+> `1006`), so trust the rig CA up front. macOS:
 > ```bash
-> # macOS:
 > sudo security add-trusted-cert -d -r trustRoot \
 >   -k /Library/Keychains/System.keychain certs/out/ca.crt
 > ```
-> (Linux: copy `certs/out/ca.crt` into your browser/OS trust store.) Alternatively,
-> open `https://localhost:8443/` once and click through the warning — you'll get a
-> `404` page, which means the WSS endpoint works; the cert exception then lets the
-> WebSocket connect.
+> (Linux: add `certs/out/ca.crt` to your OS/browser trust store.)
 
-Open `https://localhost:8081/` and register as `webrtc@rig.local` / `webrtc123`.
-The WSS server defaults to `wss://localhost:8443` (Kamailio's WSS port is published
-to the host; the cert is valid for `localhost`). Call `moh`, `voicemail`, `ivr`,
-`attendant`, `ooo`, or another subscriber (`alice` / `bob`).
-
-### Softphone
-
-All SIP/RTP ports are published to `localhost`, so point a softphone at
-`localhost:5060` (UDP/TCP) or `localhost:5061` (TLS), domain `rig.local`, as
-`alice@rig.local` / `bob@rig.local`. Seeded passwords are in
-`kamailio/initdb.d/10-seed.sql`.
-
-> **macOS / Windows:** reach the rig via these **published `localhost` ports** —
-> the docker container IPs (`172.30.10.x`) are not routable from the host. On
-> **Linux** you can instead hit the container IPs directly and map
-> `kamailio.rig.local` → `172.30.10.10` in `/etc/hosts`.
-
-To exercise the full Sipfront path locally, run one agent against a personal dev
-pool (set `SF_POOL_ID`/`SF_POOL_SECRET` in `.env`):
-
-```bash
-make agent
-```
-
-## Status / roadmap
-
-- **Phase 1 (current):** SIP register/auth/location, routing to Asterisk service
-  URIs, media bridged external↔internal via rtpengine, and a human-usable WSS web
-  client.
-- **Phase 2 (planned):** automated in-runner headless-browser WebRTC test so the
-  browser↔agent DTLS-SRTP media path is CI-tested too.
-
-> Note: rtpengine runs **userspace-only** (`table = -1`) because GitHub runners don't
-> provide the in-kernel forwarding module. Fine for functional testing.
+**Softphone** — point at `localhost:5060` (UDP/TCP) or `localhost:5061` (TLS), domain
+`rig.local`, as `alice` / `bob` (seeded passwords in `kamailio/initdb.d/10-seed.sql`).
+On macOS/Windows use these published `localhost` ports — the container IPs
+(`172.30.10.x`) aren't routable from the host.
