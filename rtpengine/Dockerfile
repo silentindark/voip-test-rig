@@ -8,6 +8,11 @@ FROM debian:${DEBIAN_TAG}
 ARG RTPENGINE_REPO=rtpengine-mr26.0
 ENV DEBIAN_FRONTEND=noninteractive
 
+# rtpengine-daemon is built with transcoding (it pulls in the ffmpeg libs). We
+# add libopus0 explicitly so rtpengine can transcode Opus <-> G711: every call
+# is forced through Asterisk, which only speaks ulaw/alaw, so rtpengine bridges
+# any richer endpoint codec (Opus, G722, …) down to G711 on the app-server leg.
+# See route[RTPENGINE] in kamailio.cfg.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates gnupg curl \
  && . /etc/os-release \
@@ -16,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && echo "deb [signed-by=/usr/share/keyrings/kamailio.gpg] http://deb.kamailio.org/${RTPENGINE_REPO} ${VERSION_CODENAME} main" \
         > /etc/apt/sources.list.d/rtpengine.list \
  && apt-get update && apt-get install -y --no-install-recommends \
-        rtpengine-daemon \
+        rtpengine-daemon libopus0 \
  && apt-get purge -y curl gnupg && apt-get autoremove -y \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
