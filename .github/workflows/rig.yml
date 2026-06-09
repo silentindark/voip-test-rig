@@ -52,27 +52,55 @@ jobs:
       - name: Settle (let agents connect to the Sipfront cloud)
         run: sleep 25
 
-      - name: Run project — voip-test-rig
-        id: project_run
+      # ===================================================================
+      # TEMPORARY: iterating on the Opus codec fix. Run ONLY the single
+      # "Codec Test: Opus" test on each push for fast feedback. Revert this
+      # whole block to the project run below once Opus is green.
+      # ===================================================================
+      - name: "TEMP — Codec Test: Opus only"
+        id: test_opus
         if: ${{ !cancelled() }}
         uses: sipfront/action-call-test@v1.0.1
         with:
           public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
           secret_key: ${{ secrets.SF_API_SECRET_KEY }}
           sf_environment: dev
-          mode: project
-          project_name: voip-test-rig
+          mode: test
+          name: "Codec Test: Opus"
           report_mode: kiosk
 
       - name: Report
         if: ${{ !cancelled() }}
         run: |
           {
-            echo "### Sipfront project run — voip-test-rig"
-            echo "- **status**: ${{ steps.project_run.outputs.status || 'n/a' }}"
-            echo "- **tests started**: ${{ steps.project_run.outputs.tests_started || '?' }}/${{ steps.project_run.outputs.total_tests || '?' }}"
-            echo "- **report**: ${{ steps.project_run.outputs.report_url }}"
+            echo "### TEMP — Codec Test: Opus"
+            echo "- **status**: ${{ steps.test_opus.outputs.status || 'n/a' }}"
+            echo "- **result**: ${{ steps.test_opus.outputs.result_description }}"
+            echo "- **report**: ${{ steps.test_opus.outputs.report_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Restore this when the Opus test passes (delete the TEMP block above) ---
+      # - name: Run project — voip-test-rig
+      #   id: project_run
+      #   if: ${{ !cancelled() }}
+      #   uses: sipfront/action-call-test@v1.0.1
+      #   with:
+      #     public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
+      #     secret_key: ${{ secrets.SF_API_SECRET_KEY }}
+      #     sf_environment: dev
+      #     mode: project
+      #     project_name: voip-test-rig
+      #     report_mode: kiosk
+      #
+      # - name: Report
+      #   if: ${{ !cancelled() }}
+      #   run: |
+      #     {
+      #       echo "### Sipfront project run — voip-test-rig"
+      #       echo "- **status**: ${{ steps.project_run.outputs.status || 'n/a' }}"
+      #       echo "- **tests started**: ${{ steps.project_run.outputs.tests_started || '?' }}/${{ steps.project_run.outputs.total_tests || '?' }}"
+      #       echo "- **report**: ${{ steps.project_run.outputs.report_url }}"
+      #     } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
         if: ${{ always() }}
