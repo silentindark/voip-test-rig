@@ -74,9 +74,10 @@ jobs:
           timeout: "3600"
 
       # The action only outputs run totals, so pull the per-test pass/fail breakdown
-      # from the Sipfront API (HTTP Basic auth): GET /projects/:id/status/last gives
-      # every test's last result, and /projects/:id/tests maps test_id -> name. Since
-      # CI runs nothing else against this project concurrently, "last" == this run.
+      # from the Sipfront API (HTTP Basic auth): GET /projects/:id/status/last returns
+      # {tests:[{run:{has_passed,result_description,…}, test:{id,name,…}}]} — every
+      # test's last result, names included. Since CI runs nothing else against this
+      # project concurrently, "last" == this run.
       - name: Report
         if: ${{ !cancelled() }}
         env:
@@ -88,21 +89,20 @@ jobs:
         run: |
           base="https://app.dev.sipfront.com/api/v2"
           last=$(curl -fsS -u "${SF_API_PUBLIC_KEY}:${SF_API_SECRET_KEY}" "${base}/projects/${PROJECT_ID}/status/last" || echo "")
-          tests=$(curl -fsS -u "${SF_API_PUBLIC_KEY}:${SF_API_SECRET_KEY}" "${base}/projects/${PROJECT_ID}/tests" || echo "[]")
           {
             echo "### Sipfront project run — voip-test-rig"
             echo "- **overall**: ${RUN_STATUS:-n/a} — [report](${REPORT_URL})"
             if [ -n "$last" ]; then
-              jq -rn --argjson last "$last" --argjson tests "$tests" '
-                ($last.data? // $last) as $rows
-                | (($tests.data? // $tests) | map({(.id|tostring): .name}) | add // {}) as $names
-                | ($rows | map(select(.has_passed == 1)) | length) as $passed
+              jq -rn --argjson last "$last" '
+                ($last.tests? // $last.data? // $last) as $rows
+                | ($rows | map(select(.run.has_passed == 1)) | length) as $passed
                 | ($rows | length) as $total
                 | "- **passed**: \($passed)/\($total) · **failed**: \($total - $passed)",
-                  ( ($rows | map(select(.has_passed != 1))) as $failed
+                  ( ($rows | map(select(.run.has_passed != 1))) as $failed
                     | if ($failed | length) > 0 then
                         "- **failed tests:**",
-                        ( $failed[] | "  - " + ($names[(.test_id|tostring)] // ("test #" + (.test_id|tostring))) + " — " + (.result_description // "?") )
+                        ( $failed[] | "  - " + (.test.name // ("test #" + (.test.id|tostring)))
+                          + (if (.run.result_description // "") != "" then " — " + .run.result_description else "" end) )
                       else "- all tests passed ✅" end )
               ' || echo "- (could not parse per-test results)"
             else
