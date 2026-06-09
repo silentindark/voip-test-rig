@@ -60,8 +60,9 @@ register and place calls against the rig:
 - **One browser agent** (`scripts/launch-webrtc-agent.sh`) — a Selenium Chrome plus a
   `sipfront/agent` joined to pool-group **`webrtc`**, which loads the sip.js client in a
   real browser and places WebRTC calls. It trusts the rig CA and reaches the stack by
-  its cert-valid FQDNs (`webapp.rig.local`, `kamailio.rig.local`). Reference scripts and
-  the cloud-test setup are in [`tests/webrtc/`](tests/webrtc/).
+  its cert-valid FQDNs (`webapp.rig.local`, `kamailio.rig.local`). The browser test
+  itself (CodeceptJS script, `browser_url`, credentials) is defined on the Sipfront
+  side.
 
 The on-demand CA is mounted into every agent (and the browser) so they accept the rig's
 self-signed TLS/WSS.

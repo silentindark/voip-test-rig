@@ -50,7 +50,7 @@ jobs:
         run: bash scripts/launch-agents.sh "${AGENT_COUNT}"
 
       # Browser (WebRTC) agent: a Selenium Chrome + a sipfront/agent (agent:dev)
-      # browser agent in pool-group "webrtc", driving the sip.js webapp (see tests/webrtc/).
+      # browser agent in pool-group "webrtc", driving the sip.js webapp.
       - name: Launch WebRTC browser agent
         env:
           SF_POOL_ID: ${{ secrets.SF_POOL_ID }}

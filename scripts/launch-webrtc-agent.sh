@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #
 # Launch a browser (WebRTC) test agent into the rig's external network: a Selenium
-# Chrome container plus a `sipfront/agent-selenium` agent that drives it. The agent
-# joins pool-group "webrtc" so the Sipfront cloud routes browser steps to it (vs the
-# baresip agents in default/customer/local from launch-agents.sh). The cloud pushes
-# the codecept script + browser_url + credentials at run time; see tests/webrtc/.
+# Chrome container plus a sipfront/agent (agent:dev) browser agent that drives it.
+# The agent joins pool-group "webrtc" so the Sipfront cloud routes browser steps to
+# it (vs the baresip agents in default/customer/local from launch-agents.sh). At run
+# time the cloud pushes the CodeceptJS script, the browser_url and the SIP
+# credentials — all defined on the Sipfront browser test (browser_url points at
+# https://webapp.rig.local/).
 #
-# Self-contained: uses the same sipfront/agent image as the baresip agents (the
-# CodeceptJS + remote-Selenium runtime already lives in it; the sibling
-# agent-selenium project is just a local build of it plus a force-exit patch, not
-# a published image) + selenium/standalone-chrome.
+# Self-contained: the CodeceptJS + remote-Selenium runtime is built into the
+# sipfront/agent image itself, so we just run that image (no separate published
+# "agent-selenium" image needed) alongside selenium/standalone-chrome.
 #
 # Usage: scripts/launch-webrtc-agent.sh
 # Env:   SF_POOL_ID, SF_POOL_SECRET (required), SF_IOTCORE_HOST, SF_SYS (dev|prod)
@@ -19,18 +20,18 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 [ -f .env ] && { set -a; . ./.env; set +a; }
 
 # sipfront/agent:dev carries browser-agent fixes not yet in :latest.
-AGENT_IMAGE="${SF_AGENT_SELENIUM_IMAGE:-${SF_AGENT_IMAGE:-sipfront/agent:dev}}"
+AGENT_IMAGE="${SF_AGENT_IMAGE:-sipfront/agent:dev}"
 SELENIUM_IMAGE="${SF_SELENIUM_IMAGE:-selenium/standalone-chrome:latest}"
-# The browser stack (Selenium Chrome, agent-selenium) is published amd64-only;
+# The browser stack (Selenium Chrome and the sipfront/agent image) is amd64-only;
 # pin the platform so it runs on arm64 hosts too (no-op on amd64 CI runners).
 PLATFORM="${SF_BROWSER_PLATFORM:-linux/amd64}"
 NETWORK="${RIG_NETWORK:-rig-external}"
 SF_SYS="${SF_SYS:-dev}"
 SELENIUM_NAME="sf-selenium"
 AGENT_NAME="sf-agent-webrtc"
-# The agent connects to the Selenium host named "selenium" (agent-selenium
-# convention; the base agent uses this regardless of SF_SELENIUM_HOST). Expose our
-# container under that DNS name via a network alias.
+# The agent connects to the Selenium host named "selenium" (the base agent uses this
+# name regardless of SF_SELENIUM_HOST). Expose our container under that DNS name via
+# a network alias.
 SELENIUM_HOST="selenium"
 
 : "${SF_POOL_ID:?set SF_POOL_ID (CI: GitHub secret)}"
@@ -80,7 +81,7 @@ if [ -f "${ca}" ]; then
     || echo "warn: could not import rig CA into ${SELENIUM_NAME} (browser TLS may fail)"
 fi
 
-# --- Browser agent (agent-selenium) ------------------------------------------
+# --- Browser agent (sipfront/agent driving Selenium) -------------------------
 docker rm -f "${AGENT_NAME}" >/dev/null 2>&1 || true
 echo "Starting ${AGENT_NAME} (${AGENT_IMAGE}) on ${NETWORK} (mqtt=${SF_IOTCORE_HOST}, group=webrtc) ..."
 ca_mount=()
