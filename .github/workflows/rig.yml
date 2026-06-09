@@ -60,27 +60,57 @@ jobs:
       - name: Settle (let agents connect to the Sipfront cloud)
         run: sleep 25
 
-      - name: Run project — voip-test-rig
-        id: project_run
+      # ===================================================================
+      # TEMPORARY: validating the WebRTC browser agent. Run ONLY the single
+      # "Browser: Outgoing webrtc to bob" test (browser caller via sf-agent-webrtc
+      # in group "webrtc"; bob answered by a baresip agent). The browser + baresip
+      # agents are launched above, before this step. Restore the project run
+      # (commented below) once it's green.
+      # ===================================================================
+      - name: "TEMP — Browser: Outgoing webrtc to bob"
+        id: test_webrtc
         if: ${{ !cancelled() }}
         uses: sipfront/action-call-test@v1.0.1
         with:
           public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
           secret_key: ${{ secrets.SF_API_SECRET_KEY }}
           sf_environment: dev
-          mode: project
-          project_name: voip-test-rig
+          mode: test
+          name: "Browser: Outgoing webrtc to bob"
           report_mode: kiosk
 
       - name: Report
         if: ${{ !cancelled() }}
         run: |
           {
-            echo "### Sipfront project run — voip-test-rig"
-            echo "- **status**: ${{ steps.project_run.outputs.status || 'n/a' }}"
-            echo "- **tests started**: ${{ steps.project_run.outputs.tests_started || '?' }}/${{ steps.project_run.outputs.total_tests || '?' }}"
-            echo "- **report**: ${{ steps.project_run.outputs.report_url }}"
+            echo "### TEMP — Browser: Outgoing webrtc to bob"
+            echo "- **status**: ${{ steps.test_webrtc.outputs.status || 'n/a' }}"
+            echo "- **result**: ${{ steps.test_webrtc.outputs.result_description }}"
+            echo "- **report**: ${{ steps.test_webrtc.outputs.report_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Restore this when the browser test is green (delete the TEMP block above) ---
+      # - name: Run project — voip-test-rig
+      #   id: project_run
+      #   if: ${{ !cancelled() }}
+      #   uses: sipfront/action-call-test@v1.0.1
+      #   with:
+      #     public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
+      #     secret_key: ${{ secrets.SF_API_SECRET_KEY }}
+      #     sf_environment: dev
+      #     mode: project
+      #     project_name: voip-test-rig
+      #     report_mode: kiosk
+      #
+      # - name: Report
+      #   if: ${{ !cancelled() }}
+      #   run: |
+      #     {
+      #       echo "### Sipfront project run — voip-test-rig"
+      #       echo "- **status**: ${{ steps.project_run.outputs.status || 'n/a' }}"
+      #       echo "- **tests started**: ${{ steps.project_run.outputs.tests_started || '?' }}/${{ steps.project_run.outputs.total_tests || '?' }}"
+      #       echo "- **report**: ${{ steps.project_run.outputs.report_url }}"
+      #     } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
         if: ${{ always() }}
