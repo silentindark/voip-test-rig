@@ -53,12 +53,12 @@ jobs:
         run: sleep 25
 
       # ===================================================================
-      # TEMPORARY: iterating on the codec-transcoding fix. Run ONLY the
-      # single codec tests on each push for fast feedback. Revert this whole
-      # block to the project run below once the codec tests are green.
+      # TEMPORARY: iterating on the music-on-hold feature. Run ONLY the
+      # single "Hold and Retrieve Test" on each push for fast feedback.
+      # Revert this whole block to the project run below once it's green.
       # ===================================================================
-      - name: "TEMP — Codec Test: Opus"
-        id: test_opus
+      - name: "TEMP — Hold and Retrieve Test"
+        id: test_hold
         if: ${{ !cancelled() }}
         uses: sipfront/action-call-test@v1.0.1
         with:
@@ -66,28 +66,17 @@ jobs:
           secret_key: ${{ secrets.SF_API_SECRET_KEY }}
           sf_environment: dev
           mode: test
-          name: "Codec Test: Opus"
-          report_mode: kiosk
-
-      - name: "TEMP — Codec Test: G.722"
-        id: test_g722
-        if: ${{ !cancelled() }}
-        uses: sipfront/action-call-test@v1.0.1
-        with:
-          public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
-          secret_key: ${{ secrets.SF_API_SECRET_KEY }}
-          sf_environment: dev
-          mode: test
-          name: "Codec Test: G.722"
+          name: "Hold and Retrieve Test"
           report_mode: kiosk
 
       - name: Report
         if: ${{ !cancelled() }}
         run: |
           {
-            echo "### TEMP — codec tests"
-            echo "- **Opus**: ${{ steps.test_opus.outputs.status || 'n/a' }} — ${{ steps.test_opus.outputs.result_description }} — ${{ steps.test_opus.outputs.report_url }}"
-            echo "- **G.722**: ${{ steps.test_g722.outputs.status || 'n/a' }} — ${{ steps.test_g722.outputs.result_description }} — ${{ steps.test_g722.outputs.report_url }}"
+            echo "### TEMP — Hold and Retrieve Test"
+            echo "- **status**: ${{ steps.test_hold.outputs.status || 'n/a' }}"
+            echo "- **result**: ${{ steps.test_hold.outputs.result_description }}"
+            echo "- **report**: ${{ steps.test_hold.outputs.report_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # --- Restore this when the Opus test passes (delete the TEMP block above) ---
