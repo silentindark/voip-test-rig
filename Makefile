@@ -10,7 +10,7 @@ endif
 SF_IOTCORE_HOST ?= mqtt.dev.sipfront.net
 
 .DEFAULT_GOAL := help
-.PHONY: help certs regen-certs build run up stop down logs ps restart agent clean
+.PHONY: help certs regen-certs build run up stop down logs ps restart agent webrtc-agent clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -40,6 +40,7 @@ stop: ## Stop and remove the rig containers, networks and volumes
 
 down: stop ## Alias for `stop`, plus remove any local Sipfront agents
 	-docker rm -f $$(docker ps -aq --filter 'name=sf-agent-') 2>/dev/null || true
+	-docker rm -f sf-selenium 2>/dev/null || true
 
 restart: down run ## Recreate the rig from scratch
 
@@ -53,6 +54,10 @@ AGENTS ?= 2
 agent: ## Launch AGENTS Sipfront agents on the external net (needs SF_POOL_ID/SECRET in .env)
 	bash scripts/launch-agents.sh $(AGENTS)
 	@echo "Logs: docker logs -f sf-agent-1"
+
+webrtc-agent: ## Launch a browser (WebRTC) agent in group "webrtc" + Selenium (needs SF_POOL_ID/SECRET in .env)
+	bash scripts/launch-webrtc-agent.sh
+	@echo "Logs: docker logs -f sf-agent-webrtc"
 
 clean: down ## Stop everything and delete generated certs
 	rm -rf certs/out

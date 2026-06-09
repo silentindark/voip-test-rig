@@ -49,6 +49,14 @@ jobs:
           SF_POOL_SECRET: ${{ secrets.SF_POOL_SECRET }}
         run: bash scripts/launch-agents.sh "${AGENT_COUNT}"
 
+      # Browser (WebRTC) agent: a Selenium Chrome + a sipfront/agent-selenium agent
+      # in pool-group "webrtc", driving the sip.js webapp (see tests/webrtc/).
+      - name: Launch WebRTC browser agent
+        env:
+          SF_POOL_ID: ${{ secrets.SF_POOL_ID }}
+          SF_POOL_SECRET: ${{ secrets.SF_POOL_SECRET }}
+        run: bash scripts/launch-webrtc-agent.sh
+
       - name: Settle (let agents connect to the Sipfront cloud)
         run: sleep 25
 
@@ -82,6 +90,8 @@ jobs:
           for i in $(seq 1 "${AGENT_COUNT}"); do
             docker logs "sf-agent-${i}" > "rig-logs/sf-agent-${i}.log" 2>&1 || true
           done
+          docker logs sf-agent-webrtc > rig-logs/sf-agent-webrtc.log 2>&1 || true
+          docker logs sf-selenium    > rig-logs/sf-selenium.log    2>&1 || true
 
       - name: Upload logs
         if: ${{ always() }}
@@ -95,4 +105,5 @@ jobs:
         if: ${{ always() }}
         run: |
           for i in $(seq 1 "${AGENT_COUNT}"); do docker rm -f "sf-agent-${i}" || true; done
+          docker rm -f sf-agent-webrtc sf-selenium || true
           docker compose down -v || true
