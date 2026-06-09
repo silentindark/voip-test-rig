@@ -28,6 +28,10 @@ NETWORK="${RIG_NETWORK:-rig-external}"
 SF_SYS="${SF_SYS:-dev}"
 SELENIUM_NAME="sf-selenium"
 AGENT_NAME="sf-agent-webrtc"
+# The agent connects to the Selenium host named "selenium" (agent-selenium
+# convention; the base agent uses this regardless of SF_SELENIUM_HOST). Expose our
+# container under that DNS name via a network alias.
+SELENIUM_HOST="selenium"
 
 : "${SF_POOL_ID:?set SF_POOL_ID (CI: GitHub secret)}"
 : "${SF_POOL_SECRET:?set SF_POOL_SECRET (CI: GitHub secret)}"
@@ -48,7 +52,7 @@ ca_sel_mount=()
 docker run -d --init --pull always \
   --platform "${PLATFORM}" \
   --name "${SELENIUM_NAME}" --hostname "${SELENIUM_NAME}" \
-  --network "${NETWORK}" \
+  --network "${NETWORK}" --network-alias "${SELENIUM_HOST}" \
   --shm-size=2g \
   "${ca_sel_mount[@]}" \
   "${SELENIUM_IMAGE}" >/dev/null
@@ -91,7 +95,7 @@ docker run -d --init --pull always \
   --env SF_POOL_SECRET="${SF_POOL_SECRET}" \
   --env SF_LOGGER=console \
   --env SF_POOL_GROUP="webrtc" \
-  --env SF_SELENIUM_HOST="${SELENIUM_NAME}" \
+  --env SF_SELENIUM_HOST="${SELENIUM_HOST}" \
   --env SF_SELENIUM_PORT=4444 \
   --env SF_SELENIUM_PATH=/wd/hub \
   --env SF_CODECEPTJS_FORCE_EXIT=true \
