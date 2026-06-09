@@ -71,6 +71,7 @@ jobs:
           mode: project
           project_name: voip-test-rig
           report_mode: kiosk
+          timeout: "3600"
 
       - name: Report
         if: ${{ !cancelled() }}
