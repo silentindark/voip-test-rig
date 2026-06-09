@@ -8,14 +8,16 @@ FROM debian:${DEBIAN_TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# asterisk + a ulaw core-sounds set (for the hold announcement). Seed the MoH
-# directory with one bundled example prompt; ulaw needs no extra codec since
-# Asterisk already speaks ulaw/alaw toward rtpengine.
+# asterisk + a wav core-sounds set (for the hold announcement). Debian ships the
+# en core sounds only as gsm/wav/g722 — no ulaw variant. Seed the MoH directory
+# with one bundled example prompt; the wav is 8kHz signed-linear and codec_ulaw
+# (already loaded) converts it to the G711 Asterisk speaks toward rtpengine, so
+# no extra codec is needed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        asterisk asterisk-core-sounds-en-ulaw \
+        asterisk asterisk-core-sounds-en-wav \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /var/run/asterisk /var/lib/asterisk/moh \
- && cp /usr/share/asterisk/sounds/en/demo-congrats.ulaw /var/lib/asterisk/moh/ \
+ && cp /usr/share/asterisk/sounds/en/demo-congrats.wav /var/lib/asterisk/moh/ \
  && chown -R asterisk:asterisk /var/run/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk
 
 # Override only the files that define this rig's behaviour; the rest of the
