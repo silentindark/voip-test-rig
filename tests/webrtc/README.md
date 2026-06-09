@@ -37,7 +37,8 @@ In project **voip-test-rig** (id 1659), agentpool **voip-test-rig**:
 
 - **Scenario:** `browser_calling_party_only` (Desktop Browser → Calling Party Only).
 - **Browser step:**
-  - `browser_url` = `https://172.30.10.50/` (the webapp; the cert SAN covers this IP)
+  - `browser_url` = `https://webapp.rig.local/` (the webapp; resolvable in-rig via a
+    compose network alias and valid against the cert SAN)
   - `browser_name` = `Chrome`, OS Linux
   - **pool-group** = `webrtc`
   - `test_script` = contents of `call-ooo_test.js`
@@ -51,9 +52,11 @@ Add the test to the project so the CI `mode: project` run picks it up automatica
 
 ## Notes
 
-- The script overrides the webapp's `#server` to `wss://172.30.10.10:8443` so the
-  in-rig browser reaches Kamailio directly (the host default `wss://localhost:8443`
-  is not reachable from inside the rig).
+- The script overrides the webapp's `#server` to `wss://kamailio.rig.local:8443` so
+  the in-rig browser reaches Kamailio by its cert-valid FQDN (the host default
+  `wss://localhost:8443` is not reachable from inside the rig). Both
+  `webapp.rig.local` and `kamailio.rig.local` resolve in-rig via docker-compose
+  network aliases and match the cert SANs.
 - The Selenium browser must trust the rig CA (self-signed) for the webapp HTTPS and
   the Kamailio WSS — `scripts/launch-webrtc-agent.sh` imports it into the Selenium
   container's system store and Chrome NSS DB.

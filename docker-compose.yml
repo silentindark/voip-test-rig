@@ -40,6 +40,10 @@ services:
     networks:
       external:
         ipv4_address: 172.30.10.10
+        # Resolvable, cert-valid FQDN for in-rig clients (e.g. the WebRTC browser
+        # agent's WSS endpoint wss://kamailio.rig.local:8443). Matches the cert SAN.
+        aliases:
+          - kamailio.rig.local
       internal:
         ipv4_address: 172.30.20.10
     # Published for optional local dev (a host softphone / browser). Not used in CI.
@@ -83,6 +87,10 @@ services:
     networks:
       external:
         ipv4_address: 172.30.10.50
+        # Resolvable, cert-valid FQDN for the WebRTC browser agent's browser_url
+        # (https://webapp.rig.local/). Matches the cert SAN.
+        aliases:
+          - webapp.rig.local
     ports:
       - "8081:443"
 

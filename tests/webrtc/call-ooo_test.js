@@ -19,10 +19,10 @@ Scenario('webrtc-call-ooo', async ({ I }) => {
   I.amOnPage('');
 
   // Account form. Override the WSS server so the in-rig browser reaches Kamailio
-  // directly (cert SAN includes 172.30.10.10); take the SIP account from the
-  // credentials injected by the test's credential pool.
+  // by its cert-valid FQDN (resolvable via the compose alias kamailio.rig.local);
+  // take the SIP account from the credentials injected by the test's credential pool.
   I.waitForElement('#server', 15);
-  I.fillField('#server', 'wss://172.30.10.10:8443');
+  I.fillField('#server', 'wss://kamailio.rig.local:8443');
   I.fillField('#domain', credentials.domain);
   I.fillField('#user', credentials.auth_username);
   I.fillField('#pass', credentials.auth_password);
