@@ -8,16 +8,22 @@ FROM debian:${DEBIAN_TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends asterisk \
+# asterisk + a ulaw core-sounds set (for the hold announcement). Seed the MoH
+# directory with one bundled example prompt; ulaw needs no extra codec since
+# Asterisk already speaks ulaw/alaw toward rtpengine.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        asterisk asterisk-core-sounds-en-ulaw \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
- && mkdir -p /var/run/asterisk \
- && chown asterisk:asterisk /var/run/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk
+ && mkdir -p /var/run/asterisk /var/lib/asterisk/moh \
+ && cp /usr/share/asterisk/sounds/en/demo-congrats.ulaw /var/lib/asterisk/moh/ \
+ && chown -R asterisk:asterisk /var/run/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk
 
-# Override only the three files that define this rig's behaviour; the rest of
-# the Debian default config provides a clean, bootable Asterisk.
-COPY modules.conf    /etc/asterisk/modules.conf
-COPY pjsip.conf      /etc/asterisk/pjsip.conf
-COPY extensions.conf /etc/asterisk/extensions.conf
+# Override only the files that define this rig's behaviour; the rest of the
+# Debian default config provides a clean, bootable Asterisk.
+COPY modules.conf     /etc/asterisk/modules.conf
+COPY pjsip.conf       /etc/asterisk/pjsip.conf
+COPY extensions.conf  /etc/asterisk/extensions.conf
+COPY musiconhold.conf /etc/asterisk/musiconhold.conf
 
 EXPOSE 5060/udp
 
