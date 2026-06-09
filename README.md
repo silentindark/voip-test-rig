@@ -57,14 +57,16 @@ Once the rig is up, `scripts/launch-agents.sh` starts two `sipfront/agent:latest
 containers on the **external** docker network (with `SF_FORCE_LOCAL_IP=1` so each
 advertises its docker IP — routable inside the rig). They dial **out** to the
 Sipfront dev cloud over MQTT and register to a private **agent pool**. The CI
-workflow then triggers two pre-defined Sipfront tests via the
-[`sipfront/action-call-test`](https://github.com/sipfront/action-call-test) action:
+workflow then runs the whole **`voip-test-rig` project** on Sipfront via the
+[`sipfront/action-call-test`](https://github.com/sipfront/action-call-test) action
+(`mode: project`), which executes every test in the project, e.g.:
 
-- **basic call alice to bob** — agent-to-agent call routed by Kamailio.
-- **basic call alice to asterisk-ooo** — call to a FreeSWITCH/Asterisk service URI.
+- **basic call alice to bob** — agent-to-agent call, routed by Kamailio through
+  Asterisk (which sits in the media path).
+- **basic call alice to asterisk-ooo** — call to an Asterisk service URI.
 
 The cloud backend drives the agents to REGISTER and place those calls against the
-rig. (No project run yet — that's a later addition.)
+rig; the CI job fails if any test in the project run fails.
 
 Because the agents are local containers, the on-demand CA we generate is mounted into
 them and trusted, so they accept the rig's TLS/WSS.

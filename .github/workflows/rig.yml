@@ -52,37 +52,26 @@ jobs:
       - name: Settle (let agents connect to the Sipfront cloud)
         run: sleep 25
 
-      - name: Test — basic call alice to bob
-        id: test_ab
+      - name: Run project — voip-test-rig
+        id: project_run
         if: ${{ !cancelled() }}
-        uses: sipfront/action-call-test@d5cce5b9876a0bdf69642560d8e317f6b2309402
+        uses: sipfront/action-call-test@v1.0.1
         with:
           public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
           secret_key: ${{ secrets.SF_API_SECRET_KEY }}
           sf_environment: dev
-          mode: test
-          name: basic call alice to bob
-          report_mode: kiosk
-
-      - name: Test — basic call alice to asterisk-ooo
-        id: test_ooo
-        if: ${{ !cancelled() }}
-        uses: sipfront/action-call-test@d5cce5b9876a0bdf69642560d8e317f6b2309402
-        with:
-          public_key: ${{ secrets.SF_API_PUBLIC_KEY }}
-          secret_key: ${{ secrets.SF_API_SECRET_KEY }}
-          sf_environment: dev
-          mode: test
-          name: basic call alice to asterisk-ooo
+          mode: project
+          project_name: voip-test-rig
           report_mode: kiosk
 
       - name: Report
         if: ${{ !cancelled() }}
         run: |
           {
-            echo "### Sipfront rig tests"
-            echo "- **alice → bob**: ${{ steps.test_ab.outputs.status || 'n/a' }} — ${{ steps.test_ab.outputs.report_url }}"
-            echo "- **alice → asterisk-ooo**: ${{ steps.test_ooo.outputs.status || 'n/a' }} — ${{ steps.test_ooo.outputs.report_url }}"
+            echo "### Sipfront project run — voip-test-rig"
+            echo "- **status**: ${{ steps.project_run.outputs.status || 'n/a' }}"
+            echo "- **tests started**: ${{ steps.project_run.outputs.tests_started || '?' }}/${{ steps.project_run.outputs.total_tests || '?' }}"
+            echo "- **report**: ${{ steps.project_run.outputs.report_url }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
